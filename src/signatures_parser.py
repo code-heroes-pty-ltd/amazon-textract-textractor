@@ -10,16 +10,15 @@ key_right_column = 'right'
 key_left_column = 'left'
 
 
-def parse(file_name):
+def parse(file_name, is_top_up):
     with open(file_name, 'r') as file:
         response = json.load(file)
 
-    is_top_up = is_file_top_up(file_name)
     signature_data = extract_signature_data(response, is_top_up)
     grouped_signature_data = group_by_page_column(signature_data)
     signatures = convert_to_list(grouped_signature_data)
 
-    csv_file_name = file_name.removesuffix('.json') + '_output.csv'
+    csv_file_name = file_name.removesuffix('.json') + '_signatures_output.csv'
 
     with open(csv_file_name, mode='w') as csv_file:
         fieldnames = [key_full_name, key_date, key_email]
@@ -28,10 +27,6 @@ def parse(file_name):
         writer.writeheader()
         for row in signatures:
             writer.writerow(row)
-
-
-def is_file_top_up(file_name):
-    return 'Top Up' in file_name
 
 
 def extract_signature_data(response, is_top_up):
@@ -75,15 +70,15 @@ def find_signature_by_form_type(block, is_top_up):
     if is_top_up:
         return find_top_up_form_right_signature(block) or find_top_up_form_left_signature(block)
     else:
-        return find_application_form_right_signature(block) or find_application_form_left_signature(block)
+        return find_app_form_right_signature(block) or find_app_form_left_signature(block)
 
 
-def find_application_form_left_signature(block):
-    return find_signature(block, application_form_left_column_constraints, key_left_column)
+def find_app_form_left_signature(block):
+    return find_signature(block, app_form_left_column_constraints, key_left_column)
 
 
-def find_application_form_right_signature(block):
-    return find_signature(block, application_form_right_column_constraints, key_right_column)
+def find_app_form_right_signature(block):
+    return find_signature(block, app_form_right_column_constraints, key_right_column)
 
 
 def find_top_up_form_left_signature(block):
@@ -124,7 +119,7 @@ class SignatureConstraints:
     email_left: float
 
 
-application_form_right_column_constraints = SignatureConstraints(
+app_form_right_column_constraints = SignatureConstraints(
     full_name_top=0.42458,
     full_name_left=0.52781,
     date_top=0.45682,
@@ -133,7 +128,7 @@ application_form_right_column_constraints = SignatureConstraints(
     email_left=0.52882,
 )
 
-application_form_left_column_constraints = SignatureConstraints(
+app_form_left_column_constraints = SignatureConstraints(
     full_name_top=0.42459,
     full_name_left=0.09459,
     date_top=0.45682,
