@@ -1,11 +1,10 @@
-import sys
 import os
 from urllib.parse import urlparse
-import boto3
-import time
+
 from tdp import DocumentProcessor
 from og import OutputGenerator
 from helper import FileHelper, S3Helper
+
 
 class Textractor:
     def getInputParameters(self, args):
@@ -31,6 +30,9 @@ class Textractor:
                     event['medical-insights'] = True
                 if(args[i] == '--translate'):
                     event['translate'] = args[i+1]
+                    i = i + 1
+                if args[i] == '--output':
+                    event['output'] = args[i + 1]
                     i = i + 1
 
                 i = i + 1
@@ -87,6 +89,7 @@ class Textractor:
             ips["translate"] = event["translate"]
         else:
             ips["translate"] = ""
+        ips["output"] = event['output']
 
         return ips
 
@@ -105,17 +108,28 @@ class Textractor:
             #Generate output files
             print("Generating output...")
             name, ext = FileHelper.getFileNameAndExtension(document)
-            opg = OutputGenerator(response,
-                        "{}-{}".format(name, ext),
-                        ips["forms"], ips["tables"])
-            opg.run()
 
-            if(ips["insights"] or ips["medical-insights"] or ips["translate"]):
-                opg.generateInsights(ips["insights"], ips["medical-insights"], ips["translate"], ips["awsRegion"])
+            output = ips['output']
+            temp_output_dir = output + '/' + name
+            if not os.path.exists(temp_output_dir):
+                os.mkdir(temp_output_dir)
 
-            print("{} textracted successfully.".format(document))
+            self.generate_output(document, ext, ips, name, response, temp_output_dir)
+
         else:
             print("Could not generate output for {}.".format(document))
+
+    def generate_output(self, document, ext, ips, name, response, temp_output_dir):
+        print("Generating output...")
+
+        opg = OutputGenerator(response,
+                              temp_output_dir + "/{}-{}".format(name, ext),
+                              ips["forms"], ips["tables"])
+        opg.run()
+        if ips["insights"] or ips["medical-insights"] or ips["translate"]:
+            opg.generateInsights(ips["insights"], ips["medical-insights"], ips["translate"], ips["awsRegion"])
+
+        print("{} textracted successfully.".format(document))
 
     def printFormatException(self, e):
         print("Invalid input: {}".format(e))
@@ -125,43 +139,36 @@ class Textractor:
         print('- python3 textractor.py --documents s3://mybucket/mydoc.pdf --text --forms --tables')
         print('- python3 textractor.py --documents s3://mybucket/ --text --forms --tables')
 
-    def run(self):
+    def run(self, args):
 
         ips = None
         try:
-            ips = self.validateInput(sys.argv)
+            ips = self.validateInput(args)
         except Exception as e:
             self.printFormatException(e)
 
-        #try:
         i = 1
-        totalDocuments = len(ips["documents"])
+        documents = ips["documents"]
+        total_documents = len(documents)
 
         print("\n")
         print('*' * 60)
-        print("Total input documents: {}".format(totalDocuments))
+        print("Total input documents: {}".format(total_documents))
         print('*' * 60)
 
-        for document in ips["documents"]:
+        for document in documents:
             self.processDocument(ips, i, document)
 
-            remaining = len(ips["documents"])-i
+            remaining = len(documents) - i
 
-            if(remaining > 0):
+            if remaining > 0:
                 print("\nRemaining documents: {}".format(remaining))
-
-                # print("\nTaking a short break...")
-                # time.sleep(20)
-                # print("Allright, ready to go...\n")
 
             i = i + 1
 
         print("\n")
         print('*' * 60)
-        print("Successfully textracted documents: {}".format(totalDocuments))
+        print("Successfully textracted documents: {}".format(total_documents))
         print('*' * 60)
         print("\n")
-        #except Exception as e:
-        #    print("Something went wrong:\n====================================================\n{}".format(e))
-
-Textractor().run()
+        return documents

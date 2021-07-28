@@ -55,6 +55,12 @@ class S3Helper:
 
         return files
 
+    @staticmethod
+    def upload_file_to_s3_bucket(file_path, file_name, bucket):
+        client = boto3.client('s3')
+        response = client.upload_file(file_path, bucket, file_name)
+        return response
+
 
 class FileHelper:
     @staticmethod
@@ -82,7 +88,7 @@ class FileHelper:
 
     @staticmethod
     def writeToFile(fileName, content):
-        with open(fileName, 'w') as document:
+        with open(fileName, 'w+') as document:
             document.write(content)
 
     @staticmethod
