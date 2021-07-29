@@ -22,20 +22,13 @@ def main():
     ]
     documents = Textractor().run(args)
 
-    # documents = [
-    #     'Adam Clarke _ Angela McArdle REEF_Additional Investment Form Carindale $5K Top Up #1.pdf',
-    #     'Daniel Barry Lamb ISG REEF Application Form $25K.pdf',
-    #     'Sethi Superfund ISG PAF App Form SMP $50K 4 years CRN 25509300.pdf'
-    # ]
-
     for document in documents:
         is_top_up = is_file_top_up(document)
-        document_temp_dir = get_document_temp_dir_path(output_temp_dir, document)
-
         signatures_parser.parse(get_json_response_path(output_temp_dir, document), is_top_up)
-        remove_unused_pages(document_temp_dir, is_top_up)
-        rename_files(document, document_temp_dir, is_top_up)
-        s3_uploader.upload(document_temp_dir, output_bucket)
+
+    remove_unused_pages(output_temp_dir)
+    rename_files(output_temp_dir)
+    s3_uploader.upload(output_temp_dir, output_bucket)
 
     if os.path.exists(output_temp_dir):
         shutil.rmtree(output_temp_dir, ignore_errors=True)
@@ -45,7 +38,7 @@ def is_file_top_up(file_name):
     return 'Top Up' in file_name
 
 
-def remove_unused_pages(document_temp_dir, is_top_up):
+def remove_unused_pages(document_temp_dir):
     app_form_keep_files_pattern = [
         'page-2-forms',
         '_signatures_output.csv',
@@ -56,14 +49,15 @@ def remove_unused_pages(document_temp_dir, is_top_up):
         '_signatures_output.csv',
     ]
 
-    files_pattern = top_up_keep_files_pattern if is_top_up else app_form_keep_files_pattern
     all_files = glob.glob(document_temp_dir + '*', recursive=True)
     for file in all_files:
+        is_top_up = is_file_top_up(file)
+        files_pattern = top_up_keep_files_pattern if is_top_up else app_form_keep_files_pattern
         if not any(pattern in file for pattern in files_pattern):
             os.remove(file)
 
 
-def rename_files(document, document_temp_dir, is_top_up):
+def rename_files(output_temp_dir):
     app_form_file_names_map = {
         'page-2-forms.csv': 'app_form_{}_investment_details.csv',
         '_signatures_output.csv': 'app_form_{}_signatures.csv',
@@ -74,26 +68,23 @@ def rename_files(document, document_temp_dir, is_top_up):
         '_signatures_output.csv': 'top_up_{}_signatures.csv',
     }
 
-    files_pattern = top_up_file_names_map if is_top_up else app_form_file_names_map
-    all_files = glob.glob(document_temp_dir + '*', recursive=True)
+    all_files = glob.glob(output_temp_dir + '*', recursive=True)
     for file in all_files:
+        is_top_up = is_file_top_up(file)
+        files_pattern = top_up_file_names_map if is_top_up else app_form_file_names_map
         for pattern in files_pattern.keys():
             if pattern in file:
-                new_file_name = document_temp_dir + files_pattern[pattern].format(get_document_name(document))
+                new_file_name = output_temp_dir + files_pattern[pattern].format(get_document_name(file, output_temp_dir))
                 os.rename(file, new_file_name)
 
 
-def get_document_temp_dir_path(output_temp_dir, document):
-    return output_temp_dir + get_document_name(document) + '/'
-
-
 def get_json_response_path(output_temp_dir, document):
-    filename = get_document_name(document)
-    return output_temp_dir + filename + '/' + filename + '-pdf-response.json'
+    filename = get_document_name(document, output_temp_dir)
+    return output_temp_dir + filename + '-pdf-response.json'
 
 
-def get_document_name(document):
-    return document.removesuffix('.pdf')
+def get_document_name(document, output_temp_dir):
+    return document.removesuffix('.pdf').removeprefix(output_temp_dir)
 
 
 if __name__ == '__main__':

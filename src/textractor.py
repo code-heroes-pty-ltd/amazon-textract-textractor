@@ -109,19 +109,15 @@ class Textractor:
             print("Generating output...")
             name, ext = FileHelper.getFileNameAndExtension(document)
 
-            output = ips['output']
-            temp_output_dir = output + '/' + name
-            if not os.path.exists(temp_output_dir):
-                os.mkdir(temp_output_dir)
-
-            self.generate_output(document, ext, ips, name, response, temp_output_dir)
+            self.generate_output(document, ext, ips, name, response)
 
         else:
             print("Could not generate output for {}.".format(document))
 
-    def generate_output(self, document, ext, ips, name, response, temp_output_dir):
+    def generate_output(self, document, ext, ips, name, response):
         print("Generating output...")
 
+        temp_output_dir = ips['output']
         opg = OutputGenerator(response,
                               temp_output_dir + "/{}-{}".format(name, ext),
                               ips["forms"], ips["tables"])
